@@ -1,0 +1,63 @@
+from machine import Pin
+import time
+
+# Ultrasonic sensor pins
+Trig = Pin(19, Pin.OUT)
+Echo = Pin(18, Pin.IN)
+
+# Handle both Pico LED cases
+try:
+    LED = Pin("LED", Pin.OUT)   # Newer firmware
+except:
+    LED = Pin(25, Pin.OUT)      # Older firmware
+
+soundVelocity = 340  # m/s
+
+
+def getDistance(timeout_us=30000):
+    # Send trigger pulse
+    Trig.value(1)
+    time.sleep_us(10)
+    Trig.value(0)
+
+    # Wait for echo start
+    start_wait = time.ticks_us()
+    while not Echo.value():
+        if time.ticks_diff(time.ticks_us(), start_wait) > timeout_us:
+            return None
+
+    pingStart = time.ticks_us()
+
+    # Wait for echo end
+    while Echo.value():
+        if time.ticks_diff(time.ticks_us(), pingStart) > timeout_us:
+            return None
+
+    pingStop = time.ticks_us()
+
+    # Calculate distance
+    distanceTime = time.ticks_diff(pingStop, pingStart) // 2
+    distance = int(soundVelocity * distanceTime // 10000)
+
+    return distance
+
+
+# Sensor settle time
+time.sleep(2)
+
+while True:
+    distance = getDistance()
+
+    if distance is None:
+        print("No reading")
+        LED.value(0)
+
+    else:
+        print("Distance:", distance, "cm")
+
+        if distance <= 10:
+            LED.toggle()      # blink
+            time.sleep(0.2)
+        else:
+            LED.value(0)
+            time.sleep(0.5)
